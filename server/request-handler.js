@@ -21,22 +21,41 @@ var defaultCorsHeaders = {
 
 var serverStack = [];
 
+var decodeBuffer = function(bufferBody) {
+  var bufferObj = {};
+  var bodyArr = bufferBody.split('&');
+  bodyArr.forEach((property, index, bodyArr) => {
+    let propertyArr = property.split('=');
+    bufferObj[propertyArr[0]] = propertyArr[1];
+  });
+  return bufferObj;
+};
+
+var getMessage = function (response, urlEnd) {
+  console.log(urlEnd);
+  if (urlEnd[1] === 'order=-createdAt') {
+    response.results = response.results.slice().reverse();
+  }
+};
 
 var postMessage = function(request) {
   var body = [];
   request.on('data', (chunk) => {
-    body.push(chunk);
+    body.push(chunk.toString('utf-8'));
   });
   request.on('end', () => {
     // body = Buffer.concat(body).toString();
-    serverStack.push(JSON.parse(JSON.stringify(body)));
+    // console.log(JSON.parse(body.toString()));
+    //for tests: 
+    // serverStack.push(JSON.parse(body.toString()));
+    //for servers:
+    console.log('body: ', body[0]);
+    console.log('decoded: ', decodeBuffer(body[0]));
+    // console.log((JSON.parse(JSON.stringify(body[0]))).toString('utf-8'));
+    serverStack.push(decodeBuffer(body[0]));
   });
-  console.log(request.method);
 };
 
-var getMessage = function (request) {
-  
-};
 
 var requestHandler = function(request, response) {
   var headers = defaultCorsHeaders;
@@ -47,8 +66,8 @@ var requestHandler = function(request, response) {
   };
 
   var urlEnd = request.url.split('?');
-  urlEnd = urlEnd[0];
-  if (!urlEnd.includes('/classes/messages')) {
+  // urlEnd = urlEnd[0];
+  if (!urlEnd[0].includes('/classes/messages')) {
     response.writeHead(404, headers);
     response.end();
   } 
@@ -72,7 +91,7 @@ var requestHandler = function(request, response) {
     // console.log()
     postMessage(request);
   } else if (request.method === 'GET') {
-    getMessage(request);
+    getMessage(serverResponse, urlEnd);
   }
 
   // The outgoing status.
