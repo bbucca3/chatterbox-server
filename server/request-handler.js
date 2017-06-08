@@ -1,6 +1,7 @@
 const _ = require('../client/bower_components/underscore/underscore.js');
 const url = require('url');
 const querystring = require('querystring');
+const path = require('path');
 /*************************************************************
 
 You should implement your request handler function in this file.
@@ -33,11 +34,38 @@ var decodeBuffer = function(bufferBody) {
   return bufferObj;
 };
 
+// var sendFile = function(url) {
+  
+//   if (fs.statSync(fileName).isDirectory()) {
+//     fileName += './client/index.html';
+//   }
+  // fs.readFile(fileName, 'binary', (err, file) => {
+  //   if (err) {
+  //     response.writeHead(500, headers);
+  //     response.end(err + '\n');
+  //     return;
+  //   }
+
+  //   response.writeHead(200, headers);
+  //   response.write(file, 'binary');
+  //   response.end();
+  // });
+// };
+
+
 var getMessage = function (response, urlParsed) {
+
+  let fileName = path.join(process.cwd(), url);
   if (urlParsed.query === 'order=-createdAt') {
     response.results = response.results.slice().reverse();
   }
+  // path.exists(fileName, (exists) => {
+  //   if (exists) {
+  //     sendFile(urlParsed);
+  //   }
+  // });
 };
+
 
 var postMessage = function(request) {
   var body = [];
@@ -69,12 +97,8 @@ var requestHandler = function(request, response) {
     results: serverStack
   };
 
-  // console.log(url.parse(request.url));
   var urlParsed = url.parse(request.url);
-  if (!urlParsed.pathname.includes('/classes/messages')) {
-    response.writeHead(404, headers);
-    response.end();
-  } 
+  // console.log(url.parse(request.url));
   //
   // They include information about both the incoming request, such as
   // headers and URL, and about the outgoing response, such as its status
@@ -82,6 +106,10 @@ var requestHandler = function(request, response) {
   //
   // Documentation for both request and response can be found in the HTTP section at
   // http://nodejs.org/documentation/api/
+  if (!urlParsed.pathname.includes('/classes/messages')) {
+    response.writeHead(404, headers);
+    response.end('404 Not Found\n');
+  } 
 
   // Do some basic logging.
   //
@@ -96,6 +124,9 @@ var requestHandler = function(request, response) {
     postMessage(request);
   } else if (request.method === 'GET') {
     getMessage(serverResponse, urlParsed);
+  } else if (request.method === 'OPTIONS') {
+    response.writeHead(200, headers);
+    response.end();
   }
 
   // The outgoing status.
