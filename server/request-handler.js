@@ -2,6 +2,8 @@ const _ = require('../client/bower_components/underscore/underscore.js');
 const url = require('url');
 const querystring = require('querystring');
 const path = require('path');
+
+const fs = require('fs');
 /*************************************************************
 
 You should implement your request handler function in this file.
@@ -34,36 +36,37 @@ var decodeBuffer = function(bufferBody) {
   return bufferObj;
 };
 
-// var sendFile = function(url) {
+var sendFile = function(url, fileName, response) {
   
-//   if (fs.statSync(fileName).isDirectory()) {
-//     fileName += './client/index.html';
-//   }
-  // fs.readFile(fileName, 'binary', (err, file) => {
-  //   if (err) {
-  //     response.writeHead(500, headers);
-  //     response.end(err + '\n');
-  //     return;
-  //   }
+  if (fs.statSync(fileName).isDirectory()) {
+    fileName += '/client/index.html';
+  }
+  fs.open(fileName, 'r', (err, file) => {
+    if (err) {
+      response.writeHead(500, defaultCorsHeaders);
+      response.end(err + '\n');
+      return;
+    }
 
-  //   response.writeHead(200, headers);
-  //   response.write(file, 'binary');
-  //   response.end();
-  // });
-// };
+    response.writeHead(200, defaultCorsHeaders);
+    response.write(file, 'binary');
+    response.end();
+  });
+};
 
 
 var getMessage = function (response, urlParsed) {
 
-  let fileName = path.join(process.cwd(), url);
+  let fileName = path.join(process.cwd(), urlParsed.pathname);
   if (urlParsed.query === 'order=-createdAt') {
     response.results = response.results.slice().reverse();
+  } else if (!urlParsed.pathname.includes('/classes/messages')) { 
+    sendFile(urlParsed, fileName, response);
+    // fs.accessSync(fileName, fs.constants.R_OK, (err) => {
+      // if (!err) {
+      // }
+    // });
   }
-  // path.exists(fileName, (exists) => {
-  //   if (exists) {
-  //     sendFile(urlParsed);
-  //   }
-  // });
 };
 
 
@@ -85,6 +88,7 @@ var postMessage = function(request) {
     message.username = decodeURIComponent(message.username);
     console.log('other method: ', message);
     serverStack.push(message);
+    
   });
 };
 
@@ -106,10 +110,6 @@ var requestHandler = function(request, response) {
   //
   // Documentation for both request and response can be found in the HTTP section at
   // http://nodejs.org/documentation/api/
-  if (!urlParsed.pathname.includes('/classes/messages')) {
-    response.writeHead(404, headers);
-    response.end('404 Not Found\n');
-  } 
 
   // Do some basic logging.
   //
@@ -129,6 +129,10 @@ var requestHandler = function(request, response) {
     response.end();
   }
 
+  if (!urlParsed.pathname.includes('/classes/messages')) {
+    response.writeHead(404, headers);
+    response.end('404 Not Found\n');
+  } 
   // The outgoing status.
 
   // See the note below about CORS headers.
