@@ -1,4 +1,6 @@
-var _ = require('../client/bower_components/underscore/underscore.js');
+const _ = require('../client/bower_components/underscore/underscore.js');
+const url = require('url');
+const querystring = require('querystring');
 /*************************************************************
 
 You should implement your request handler function in this file.
@@ -31,9 +33,8 @@ var decodeBuffer = function(bufferBody) {
   return bufferObj;
 };
 
-var getMessage = function (response, urlEnd) {
-  console.log(urlEnd);
-  if (urlEnd[1] === 'order=-createdAt') {
+var getMessage = function (response, urlParsed) {
+  if (urlParsed.query === 'order=-createdAt') {
     response.results = response.results.slice().reverse();
   }
 };
@@ -49,10 +50,13 @@ var postMessage = function(request) {
     //for tests: 
     // serverStack.push(JSON.parse(body.toString()));
     //for servers:
-    console.log('body: ', body[0]);
-    console.log('decoded: ', decodeBuffer(body[0]));
-    // console.log((JSON.parse(JSON.stringify(body[0]))).toString('utf-8'));
-    serverStack.push(decodeBuffer(body[0]));
+    // console.log(typeof body[0]);
+    // console.log('decoded: ', decodeBuffer(body[0]));
+    var message = querystring.parse(body[0]);
+    message.objectId = serverStack.length;
+    message.username = decodeURIComponent(message.username);
+    console.log('other method: ', message);
+    serverStack.push(message);
   });
 };
 
@@ -65,9 +69,9 @@ var requestHandler = function(request, response) {
     results: serverStack
   };
 
-  var urlEnd = request.url.split('?');
-  // urlEnd = urlEnd[0];
-  if (!urlEnd[0].includes('/classes/messages')) {
+  // console.log(url.parse(request.url));
+  var urlParsed = url.parse(request.url);
+  if (!urlParsed.pathname.includes('/classes/messages')) {
     response.writeHead(404, headers);
     response.end();
   } 
@@ -91,7 +95,7 @@ var requestHandler = function(request, response) {
     // console.log()
     postMessage(request);
   } else if (request.method === 'GET') {
-    getMessage(serverResponse, urlEnd);
+    getMessage(serverResponse, urlParsed);
   }
 
   // The outgoing status.
