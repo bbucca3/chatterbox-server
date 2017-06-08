@@ -1,3 +1,4 @@
+var _ = require('../client/bower_components/underscore/underscore.js');
 /*************************************************************
 
 You should implement your request handler function in this file.
@@ -18,19 +19,22 @@ var defaultCorsHeaders = {
   'access-control-max-age': 10 // Seconds.
 };
 
-var serverStack = [{message: 'hey'}];
+var serverStack = [];
 
 
 var postMessage = function(request) {
-  debugger;
   var body = [];
   request.on('data', (chunk) => {
     body.push(chunk);
-  }).on('end', () => {
-    body = Buffer.concat(body).toString();
   });
-  console.log('body', body);
-  return body;
+  request.on('end', () => {
+    console.log('before');
+    // body = Buffer.concat(body).toString();
+    serverStack.push(JSON.parse(body));
+    console.log('after');
+    console.log('first-body: ', body);
+  });
+  console.log(request.method);
 };
 
 var getMessage = function (request) {
@@ -38,11 +42,19 @@ var getMessage = function (request) {
 };
 
 var requestHandler = function(request, response) {
+  var headers = defaultCorsHeaders;
   var statusCode = 200;
   // Request and Response come from node's http module.
   let serverResponse = {
     results: serverStack
   };
+
+  var urlEnd = request.url.split('?');
+  urlEnd = urlEnd[0];
+  if (!urlEnd.includes('/classes/messages')) {
+    response.writeHead(404, headers);
+    response.end();
+  } 
   //
   // They include information about both the incoming request, such as
   // headers and URL, and about the outgoing response, such as its status
@@ -60,6 +72,7 @@ var requestHandler = function(request, response) {
 
   if (request.method === 'POST') {
     statusCode = 201;
+    // console.log()
     postMessage(request);
   } else if (request.method === 'GET') {
     getMessage(request);
@@ -68,7 +81,7 @@ var requestHandler = function(request, response) {
   // The outgoing status.
 
   // See the note below about CORS headers.
-  var headers = defaultCorsHeaders;
+
 
   // Tell the client we are sending them plain text.
   //
@@ -103,5 +116,5 @@ var requestHandler = function(request, response) {
 // client from this domain by setting up static file serving.
 
 
-exports.handler = requestHandler;
+module.exports.requestHandler = requestHandler;
 
