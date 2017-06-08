@@ -28,11 +28,8 @@ var postMessage = function(request) {
     body.push(chunk);
   });
   request.on('end', () => {
-    console.log('before');
     // body = Buffer.concat(body).toString();
-    serverStack.push(JSON.parse(body));
-    console.log('after');
-    console.log('first-body: ', body);
+    serverStack.push(JSON.parse(JSON.stringify(body)));
   });
   console.log(request.method);
 };
@@ -87,7 +84,7 @@ var requestHandler = function(request, response) {
   //
   // You will need to change this if you are sending something
   // other than plain text, like JSON or HTML.
-  headers['Content-Type'] = 'text/plain';
+  headers['Content-Type'] = 'application/json';
 
   // .writeHead() writes to the request line and headers of the response,
   // which includes the status and all headers.
