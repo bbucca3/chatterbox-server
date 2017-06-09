@@ -21,74 +21,73 @@ var defaultCorsHeaders = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'access-control-allow-headers': 'content-type, accept',
-  'access-control-max-age': 10 // Seconds.
+  'access-control-max-age': 10, // Seconds.,
+  'Content-Type': 'application/json'
 };
 
 var serverStack = [];
 
-var decodeBuffer = function(bufferBody) {
-  var bufferObj = {};
-  var bodyArr = bufferBody.split('&');
-  bodyArr.forEach((property, index, bodyArr) => {
-    let propertyArr = property.split('=');
-    bufferObj[propertyArr[0]] = propertyArr[1];
-  });
-  return bufferObj;
-};
-
 var sendFile = function(url, fileName, response) {
   
-  if (fs.statSync(fileName).isDirectory()) {
-    fileName += '/client/index.html';
-  }
-  fs.open(fileName, 'r', (err, file) => {
-    if (err) {
-      response.writeHead(500, defaultCorsHeaders);
-      response.end(err + '\n');
-      return;
+  fs.stat(fileName, (err, file) => {
+    if (!err && file.isDirectory()) {
+      // console.log('before: ', fileName);
+      fileName += '/index.html';
+      // console.log(fileName);
     }
-
-    response.writeHead(200, defaultCorsHeaders);
-    response.write(file, 'binary');
-    response.end();
+    fs.exists(fileName, (exists) => {
+      if (!exists) {
+        response.writeHead(404, defaultCorsHeaders);
+        response.end(`404: resource ${url} not found.`);
+        return;
+      } else {
+        fs.readFile(fileName, (err, data) => {
+          if (err) {
+            response.writeHead(500, defaultCorsHeaders);
+            response.end(`Server error: ${err}`);
+          } else {
+            response.end(data.toString('utf-8'));
+          }
+        });
+      }
+    });
   });
+  
 };
 
 
-var getMessage = function (response, urlParsed) {
-
-  let fileName = path.join(process.cwd(), urlParsed.pathname);
+var getMessage = function (serverResponse, urlParsed, response) {
+  // console.log('Try: ', process.cwd() + '/client');
+  let fileName = path.join(process.cwd() + '/client', urlParsed.pathname);
   if (urlParsed.query === 'order=-createdAt') {
-    response.results = response.results.slice().reverse();
+    serverResponse.results = serverResponse.results.slice().reverse();
+    response.writeHead(200, defaultCorsHeaders);
+    response.end(JSON.stringify(serverResponse));
   } else if (!urlParsed.pathname.includes('/classes/messages')) { 
     sendFile(urlParsed, fileName, response);
-    // fs.accessSync(fileName, fs.constants.R_OK, (err) => {
-      // if (!err) {
-      // }
-    // });
+  } else {
+    response.writeHead(200, defaultCorsHeaders);
+    response.end(JSON.stringify(serverResponse));
   }
 };
 
 
-var postMessage = function(request) {
+var postMessage = function(request, serverResponse, response) {
   var body = [];
   request.on('data', (chunk) => {
     body.push(chunk.toString('utf-8'));
   });
   request.on('end', () => {
-    // body = Buffer.concat(body).toString();
-    // console.log(JSON.parse(body.toString()));
     //for tests: 
     // serverStack.push(JSON.parse(body.toString()));
     //for servers:
-    // console.log(typeof body[0]);
-    // console.log('decoded: ', decodeBuffer(body[0]));
     var message = querystring.parse(body[0]);
     message.objectId = serverStack.length;
     message.username = decodeURIComponent(message.username);
     console.log('other method: ', message);
     serverStack.push(message);
-    
+    response.writeHead(200, defaultCorsHeaders);
+    response.end(JSON.stringify(serverResponse));
   });
 };
 
@@ -96,79 +95,25 @@ var postMessage = function(request) {
 var requestHandler = function(request, response) {
   var headers = defaultCorsHeaders;
   var statusCode = 200;
-  // Request and Response come from node's http module.
   let serverResponse = {
     results: serverStack
   };
 
   var urlParsed = url.parse(request.url);
-  // console.log(url.parse(request.url));
-  //
-  // They include information about both the incoming request, such as
-  // headers and URL, and about the outgoing response, such as its status
-  // and content.
-  //
-  // Documentation for both request and response can be found in the HTTP section at
-  // http://nodejs.org/documentation/api/
 
-  // Do some basic logging.
-  //
-  // Adding more logging to your server can be an easy way to get passive
-  // debugging help, but you should always be careful about leaving stray
-  // console.logs in your code.
   console.log('Serving request type ' + request.method + ' for url ' + request.url);
 
   if (request.method === 'POST') {
     statusCode = 201;
-    // console.log()
-    postMessage(request);
+    postMessage(request, serverResponse, response);
   } else if (request.method === 'GET') {
-    getMessage(serverResponse, urlParsed);
+    getMessage(serverResponse, urlParsed, response);
   } else if (request.method === 'OPTIONS') {
     response.writeHead(200, headers);
     response.end();
   }
-
-  if (!urlParsed.pathname.includes('/classes/messages')) {
-    response.writeHead(404, headers);
-    response.end('404 Not Found\n');
-  } 
-  // The outgoing status.
-
-  // See the note below about CORS headers.
-
-
-  // Tell the client we are sending them plain text.
-  //
-  // You will need to change this if you are sending something
-  // other than plain text, like JSON or HTML.
-  headers['Content-Type'] = 'application/json';
-
-  // .writeHead() writes to the request line and headers of the response,
-  // which includes the status and all headers.
-  response.writeHead(statusCode, headers);
-  // response.write(JSON.stringify(''));
-
-  // Make sure to always call response.end() - Node may not send
-  // anything back to the client until you do. The string you pass to
-  // response.end() will be the body of the response - i.e. what shows
-  // up in the browser.
-  //
-  // Calling .end "flushes" the response's internal buffer, forcing
-  // node to actually send all the data over to the client.
-  response.end(JSON.stringify(serverResponse));
 };
 
-
-// These headers will allow Cross-Origin Resource Sharing (CORS).
-// This code allows this server to talk to websites that
-// are on different domains, for instance, your chat client.
-//
-// Your chat client is running from a url like file://your/chat/client/index.html,
-// which is considered a different domain.
-//
-// Another way to get around this restriction is to serve you chat
-// client from this domain by setting up static file serving.
 
 
 module.exports.requestHandler = requestHandler;
